@@ -45,43 +45,26 @@ public class MainActivity extends BaseDriveActivity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 
+		// Get user SMS cursor
+		Uri uri = Uri.parse("content://sms/inbox");
+		Cursor c= getContentResolver().query(uri, null, null ,null,null);
+		String[] body = new String[c.getCount()];
+		String[] number = new String[c.getCount()];
 
-		Cursor c = databaseRO.query(DatabaseOpenHelper.SMS_TABLE_NAME,
-			new String[] { "smsID", "phoneNumber", "name", "shortenedMessage", "answerTo",
-				"dIntents", "sIntents", "numParts", "resSIntent", "resDIntent", "date"}, null, null, null , null, null);
-		int rowCount = c.getCount();
-		c.moveToFirst();
-		Telephony.Sms[] res = new Telephony.Sms[rowCount];
-		for (int i = 0; i < rowCount; i++) {
-			res[i] = new Telephony.Sms(c.getInt(0),
-				c.getString(1),
-				c.getString(2),
-				c.getString(3),
-				c.getString(4),
-				c.getString(5),
-				c.getString(6),
-				c.getInt(7),
-				c.getInt(8),
-				c.getLong(9));
-			c.moveToNext();
-		} // end for
+		if(c.moveToFirst()){
+			for(int i=0;i<c.getCount();i++){
+				body[i]= c.getString(c.getColumnIndexOrThrow("body")).toString();
+				number[i]=c.getString(c.getColumnIndexOrThrow("address")).toString();
+				c.moveToNext();
+			}
+		}
 		c.close();
 
-		// Get user SMS cursor
-		Cursor cursor = getContentResolver().query(Uri.parse("content://sms/inbox"), null, null, null, null);
-		cursor.moveToFirst();
-		// Message string (dis gonna be big, probably)
-		String msgData = "";
-		// Loop through to get all messages
-		do {
-			for(int idx = 0; idx < cursor.getColumnCount(); idx++) {
-				msgData += " " + cursor.getColumnName(idx) + ":" + cursor.getString(idx);
-			}
-		} while(cursor.moveToNext());
+		//
 
 		msgText = (TextView)findViewById(R.id.textView);
 
-		msgText.setText(msgData);
+		msgText.setText(body[1]);
 
 	} // end onCreate()
 
@@ -223,14 +206,6 @@ public class MainActivity extends BaseDriveActivity {
 	public void onConnected(Bundle connectionHint) {
 		Log.i(TAG, "API client connected.");
 
-		if (mBitmapToSave == null) {
-			// This activity has no UI of its own. Just start the camera.
-			startActivityForResult(new Intent(MediaStore.ACTION_IMAGE_CAPTURE),
-				REQUEST_CODE_CAPTURE_IMAGE);
-			return;
-		} // end if
-
-		//saveFileToDrive();
 	} // end onConnected()
 
 	@Override
