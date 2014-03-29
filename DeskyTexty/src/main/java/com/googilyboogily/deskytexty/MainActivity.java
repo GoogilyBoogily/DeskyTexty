@@ -1,14 +1,10 @@
 package com.googilyboogily.deskytexty;
 
-import android.app.Activity;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.database.Cursor;
-import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
-import android.provider.MediaStore;
-import android.provider.Telephony;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -20,11 +16,11 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.drive.Drive;
 import com.google.android.gms.drive.DriveApi;
+import com.google.android.gms.drive.DriveFolder;
 import com.google.android.gms.drive.MetadataChangeSet;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import com.google.android.gms.drive.query.Filters;
+import com.google.android.gms.drive.query.Query;
+import com.google.android.gms.drive.query.SearchableField;
 
 
 public class MainActivity extends BaseDriveActivity {
@@ -35,10 +31,12 @@ public class MainActivity extends BaseDriveActivity {
 	private static final int REQUEST_CODE_RESOLUTION = 3;
 
 	private GoogleApiClient mGoogleApiClient;
-	private Bitmap mBitmapToSave;
 
-
+	//
 	TextView msgText;
+
+	//
+	DriveFolder appFolder;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -47,25 +45,24 @@ public class MainActivity extends BaseDriveActivity {
 
 		// Get user SMS cursor
 		Uri uri = Uri.parse("content://sms/inbox");
-		Cursor c= getContentResolver().query(uri, null, null ,null,null);
+		Cursor c = getContentResolver().query(uri, null, null, null, null);
+
+		// Arrays to hold the sms messages and phone numbers
 		String[] body = new String[c.getCount()];
 		String[] number = new String[c.getCount()];
 
-		if(c.moveToFirst()){
-			for(int i=0;i<c.getCount();i++){
-				body[i]= c.getString(c.getColumnIndexOrThrow("body")).toString();
-				number[i]=c.getString(c.getColumnIndexOrThrow("address")).toString();
+		if(c.moveToFirst()) {
+			for(int i = 0; i < c.getCount(); i++) {
+				body[i] = c.getString(c.getColumnIndexOrThrow("body")).toString();
+				number[i] = c.getString(c.getColumnIndexOrThrow("address")).toString();
 				c.moveToNext();
-			}
-		}
+			} // end for
+		} // end if
 		c.close();
 
-		//
-
+		// Set the textview to the first sms message
 		msgText = (TextView)findViewById(R.id.textView);
-
 		msgText.setText(body[1]);
-
 	} // end onCreate()
 
 	@Override
@@ -73,59 +70,7 @@ public class MainActivity extends BaseDriveActivity {
 		MenuInflater inflater = getMenuInflater();
 		inflater.inflate(R.menu.main, menu);
 		return super.onCreateOptionsMenu(menu);
-	}
-
-
-	/**
-	 * Create a new file and save it to Drive.
-	 */
-	private void saveFileToDrive() {
-		// Start by creating a new contents, and setting a callback.
-		Log.i(TAG, "Creating new contents.");
-		final Bitmap image = mBitmapToSave;
-
-		Drive.DriveApi.newContents(mGoogleApiClient).setResultCallback(new ResultCallback<DriveApi.ContentsResult>() {
-			@Override
-			public void onResult(DriveApi.ContentsResult result) {
-				// If the operation was not successful, we cannot do anything
-				// and must
-				// fail.
-				if (!result.getStatus().isSuccess()) {
-					Log.i(TAG, "Failed to create new contents.");
-					return;
-				} // end if
-
-				// Otherwise, we can write our data to the new contents.
-				Log.i(TAG, "New contents created.");
-				// Get an output stream for the contents.
-				OutputStream outputStream = result.getContents().getOutputStream();
-				// Write the bitmap data from it.
-				ByteArrayOutputStream bitmapStream = new ByteArrayOutputStream();
-				image.compress(Bitmap.CompressFormat.PNG, 100, bitmapStream);
-				try {
-					outputStream.write(bitmapStream.toByteArray());
-				} catch (IOException e1) {
-					Log.i(TAG, "Unable to write file contents.");
-				} // end try/catch
-				// Create the initial metadata - MIME type and title.
-				// Note that the user will be able to change the title later.
-				MetadataChangeSet metadataChangeSet = new MetadataChangeSet.Builder()
-					.setMimeType("image/jpeg").setTitle("Android Photo.png").build();
-				// Create an intent for the file chooser, and start it.
-				IntentSender intentSender = Drive.DriveApi
-					.newCreateFileActivityBuilder()
-					.setInitialMetadata(metadataChangeSet)
-					.setInitialContents(result.getContents())
-					.build(mGoogleApiClient);
-				try {
-					startIntentSenderForResult(
-						intentSender, REQUEST_CODE_CREATOR, null, 0, 0, 0);
-				} catch (IntentSender.SendIntentException e) {
-					Log.i(TAG, "Failed to launch file chooser.");
-				} // end try/catch
-			} // end onResult()
-		});
-	} // end saveFileToDrive()
+	} // onCrateOptionMenu()
 
 	@Override
 	protected void onResume() {
@@ -143,9 +88,10 @@ public class MainActivity extends BaseDriveActivity {
 				.build();
 		} // end if
 
-		// Connect the client. Once connected, the camera is launched.
+		// Connect the client.
 		mGoogleApiClient.connect();
 	} // end onResume
+
 
 	@Override
 	protected void onPause() {
@@ -158,39 +104,19 @@ public class MainActivity extends BaseDriveActivity {
 
 	@Override
 	protected void onActivityResult(final int requestCode, final int resultCode, final Intent data) {
-		switch (requestCode) {
-			case REQUEST_CODE_CAPTURE_IMAGE:
-				// Called after a photo has been taken.
-				if (resultCode == Activity.RESULT_OK) {
-					// Store the image data as a bitmap for writing later.
-					mBitmapToSave = (Bitmap) data.getExtras().get("data");
-				} // end if
 
-				break;
-
-			case REQUEST_CODE_CREATOR:
-				// Called after a file is saved to Drive.
-				if (resultCode == RESULT_OK) {
-					Log.i(TAG, "Image successfully saved.");
-					mBitmapToSave = null;
-					// Just start the camera again for another photo.
-					startActivityForResult(new Intent(MediaStore.ACTION_IMAGE_CAPTURE),
-						REQUEST_CODE_CAPTURE_IMAGE);
-				} // end if
-
-				break;
-		} // end switch
 	} // end onActivityResult()
 
 	@Override
 	public void onConnectionFailed(ConnectionResult result) {
 		// Called whenever the API client fails to connect.
 		Log.i(TAG, "GoogleApiClient connection failed: " + result.toString());
+
 		if (!result.hasResolution()) {
 			// show the localized error dialog.
 			GooglePlayServicesUtil.getErrorDialog(result.getErrorCode(), this, 0).show();
 			return;
-		}
+		} //  end if
 		// The failure has a resolution. Resolve it.
 		// Called typically when the app is not yet authorized, and an
 		// authorization
@@ -206,7 +132,54 @@ public class MainActivity extends BaseDriveActivity {
 	public void onConnected(Bundle connectionHint) {
 		Log.i(TAG, "API client connected.");
 
+		// QUERY FOR APP FOLDER
+		Query query = new Query.Builder().addFilter(Filters.and(Filters.eq(SearchableField.TITLE, "DESKYTEXTYAPPFOLDER"),
+																Filters.eq(SearchableField.MIME_TYPE, "application/vnd.google-apps.folder"),
+																Filters.eq(SearchableField.TRASHED, false))).build();
+		Drive.DriveApi.query(getGoogleApiClient(), query).setResultCallback(metadataCallback);
+
 	} // end onConnected()
+
+	ResultCallback<DriveFolder.DriveFolderResult> folderCreatedCallback = new ResultCallback<DriveFolder.DriveFolderResult>() {
+		@Override
+		public void onResult(DriveFolder.DriveFolderResult result) {
+			if (!result.getStatus().isSuccess()) {
+				showMessage("Error while trying to create the folder");
+				return;
+			} // end if
+
+			showMessage("Created a folder: " + result.getDriveFolder().getDriveId());
+		} // end onResult
+	};
+
+	final private ResultCallback<DriveApi.MetadataBufferResult> metadataCallback = new
+		ResultCallback<DriveApi.MetadataBufferResult>() {
+			@Override
+			public void onResult(DriveApi.MetadataBufferResult result) {
+				if (!result.getStatus().isSuccess()) {
+					showMessage("Problem while retrieving results");
+					return;
+				} // end if
+
+				// If there are already files named DESKYTEXY, display them, otherwise, make it
+				if(result.getMetadataBuffer().getCount() != 0) {
+					String newString = String.valueOf(result.getMetadataBuffer().getCount()) +
+						" : " + result.getMetadataBuffer().get(0).getTitle() + " -- " +
+						result.getMetadataBuffer().get(0).getCreatedDate();
+					msgText.setText(newString);
+
+					appFolder = Drive.DriveApi.getFolder(getGoogleApiClient(), result.getMetadataBuffer().get(0).getDriveId());
+				} else {
+					// Create the metadata for "New folder"
+					MetadataChangeSet changeSet = new MetadataChangeSet.Builder().setTitle("DESKYTEXTYAPPFOLDER").build();
+
+					// Actually create the folder
+					Drive.DriveApi.getRootFolder(getGoogleApiClient()).createFolder(getGoogleApiClient(), changeSet).setResultCallback(folderCreatedCallback);
+
+					msgText.setText("Created Folder DESKYTEXTYAPPFOLDER");
+				}
+			} // end onResult()
+		};
 
 	@Override
 	public void onConnectionSuspended(int cause) {
