@@ -9,18 +9,26 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.googilyboogily.deskytexty.tasks.SaveSmsAsyncTask;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.drive.Contents;
 import com.google.android.gms.drive.Drive;
 import com.google.android.gms.drive.DriveApi;
 import com.google.android.gms.drive.DriveFolder;
+import com.google.android.gms.drive.DriveId;
 import com.google.android.gms.drive.MetadataChangeSet;
 import com.google.android.gms.drive.query.Filters;
 import com.google.android.gms.drive.query.Query;
 import com.google.android.gms.drive.query.SearchableField;
+
+import com.googilyboogily.deskytexty.tasks.SaveSmsAsyncTask;
+
+import java.io.IOException;
 
 
 public class MainActivity extends BaseDriveActivity {
@@ -33,7 +41,7 @@ public class MainActivity extends BaseDriveActivity {
 	private GoogleApiClient mGoogleApiClient;
 
 	//
-	TextView msgText;
+	static TextView msgText;
 
 	//
 	DriveFolder appFolder;
@@ -136,8 +144,8 @@ public class MainActivity extends BaseDriveActivity {
 		Query query = new Query.Builder().addFilter(Filters.and(Filters.eq(SearchableField.TITLE, "DESKYTEXTYAPPFOLDER"),
 																Filters.eq(SearchableField.MIME_TYPE, "application/vnd.google-apps.folder"),
 																Filters.eq(SearchableField.TRASHED, false))).build();
-		Drive.DriveApi.query(getGoogleApiClient(), query).setResultCallback(metadataCallback);
 
+		Drive.DriveApi.query(getGoogleApiClient(), query).setResultCallback(metadataCallback);
 	} // end onConnected()
 
 	ResultCallback<DriveFolder.DriveFolderResult> folderCreatedCallback = new ResultCallback<DriveFolder.DriveFolderResult>() {
@@ -161,7 +169,7 @@ public class MainActivity extends BaseDriveActivity {
 					return;
 				} // end if
 
-				// If there are already files named DESKYTEXY, display them, otherwise, make it
+				// If there are already files named DESKYTEXTYAPPFOLDER, display them, otherwise, make it
 				if(result.getMetadataBuffer().getCount() != 0) {
 					String newString = String.valueOf(result.getMetadataBuffer().getCount()) +
 						" : " + result.getMetadataBuffer().get(0).getTitle() + " -- " +
@@ -170,7 +178,7 @@ public class MainActivity extends BaseDriveActivity {
 
 					appFolder = Drive.DriveApi.getFolder(getGoogleApiClient(), result.getMetadataBuffer().get(0).getDriveId());
 				} else {
-					// Create the metadata for "New folder"
+					// Create the metadata for "DESKYTEXTYAPPFOLDER"
 					MetadataChangeSet changeSet = new MetadataChangeSet.Builder().setTitle("DESKYTEXTYAPPFOLDER").build();
 
 					// Actually create the folder
