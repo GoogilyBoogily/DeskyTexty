@@ -1,5 +1,6 @@
 package com.googilyboogily.deskytexty;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.database.Cursor;
@@ -9,26 +10,18 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import com.googilyboogily.deskytexty.tasks.SaveSmsAsyncTask;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
-import com.google.android.gms.drive.Contents;
 import com.google.android.gms.drive.Drive;
 import com.google.android.gms.drive.DriveApi;
 import com.google.android.gms.drive.DriveFolder;
-import com.google.android.gms.drive.DriveId;
 import com.google.android.gms.drive.MetadataChangeSet;
 import com.google.android.gms.drive.query.Filters;
 import com.google.android.gms.drive.query.Query;
 import com.google.android.gms.drive.query.SearchableField;
-
-import com.googilyboogily.deskytexty.tasks.SaveSmsAsyncTask;
-
-import java.io.IOException;
 
 
 public class MainActivity extends BaseDriveActivity {
@@ -39,6 +32,8 @@ public class MainActivity extends BaseDriveActivity {
 	private static final int REQUEST_CODE_RESOLUTION = 3;
 
 	private GoogleApiClient mGoogleApiClient;
+
+	private static Context context;
 
 	//
 	static TextView msgText;
@@ -51,14 +46,14 @@ public class MainActivity extends BaseDriveActivity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 
+		MainActivity.context = getApplicationContext();
+
 		// Get user SMS cursor
 		Uri uri = Uri.parse("content://sms/inbox");
 		Cursor c = getContentResolver().query(uri, null, null, null, null);
-
 		// Arrays to hold the sms messages and phone numbers
 		String[] body = new String[c.getCount()];
 		String[] number = new String[c.getCount()];
-
 		if(c.moveToFirst()) {
 			for(int i = 0; i < c.getCount(); i++) {
 				body[i] = c.getString(c.getColumnIndexOrThrow("body")).toString();
@@ -71,7 +66,28 @@ public class MainActivity extends BaseDriveActivity {
 		// Set the textview to the first sms message
 		msgText = (TextView)findViewById(R.id.textView);
 		msgText.setText(body[1]);
+
+
+		if (mGoogleApiClient == null) {
+			// Create the API client and bind it to an instance variable.
+			// We use this instance as the callback for connection and connection
+			// failures.
+			// Since no account name is passed, the user is prompted to choose.
+			mGoogleApiClient = new GoogleApiClient.Builder(this)
+				.addApi(Drive.API)
+				.addScope(Drive.SCOPE_FILE)
+				.addConnectionCallbacks(this)
+				.addOnConnectionFailedListener(this)
+				.build();
+		} // end if
+
+		// Connect the client.
+		mGoogleApiClient.connect();
 	} // end onCreate()
+
+	public static Context getAppContext() {
+		return MainActivity.context;
+	}
 
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
@@ -80,9 +96,11 @@ public class MainActivity extends BaseDriveActivity {
 		return super.onCreateOptionsMenu(menu);
 	} // onCrateOptionMenu()
 
+	/*
 	@Override
 	protected void onResume() {
 		super.onResume();
+
 		if (mGoogleApiClient == null) {
 			// Create the API client and bind it to an instance variable.
 			// We use this instance as the callback for connection and connection
@@ -99,7 +117,7 @@ public class MainActivity extends BaseDriveActivity {
 		// Connect the client.
 		mGoogleApiClient.connect();
 	} // end onResume
-
+	*/
 
 	@Override
 	protected void onPause() {
@@ -186,6 +204,7 @@ public class MainActivity extends BaseDriveActivity {
 
 					msgText.setText("Created Folder DESKYTEXTYAPPFOLDER");
 				}
+				mGoogleApiClient.disconnect();
 			} // end onResult()
 		};
 
