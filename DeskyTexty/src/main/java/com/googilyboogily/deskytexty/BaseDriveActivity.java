@@ -129,26 +129,6 @@ public abstract class BaseDriveActivity extends Activity implements
 	}
 
 	/**
-	 * Called when {@code mGoogleApiClient} is trying to connect but failed.
-	 * Handle {@code result.getResolution()} if there is a resolution is
-	 * available.
-	 */
-	@Override
-	public void onConnectionFailed(ConnectionResult result) {
-		Log.i(TAG, "GoogleApiClient connection failed: " + result.toString());
-		if (!result.hasResolution()) {
-			// show the localized error dialog.
-			GooglePlayServicesUtil.getErrorDialog(result.getErrorCode(), this, 0).show();
-			return;
-		}
-		try {
-			result.startResolutionForResult(this, REQUEST_CODE_RESOLUTION);
-		} catch (SendIntentException e) {
-			Log.e(TAG, "Exception while starting resolution activity", e);
-		}
-	}
-
-	/**
 	 * Shows a toast message.
 	 */
 	public void showMessage(String message) {

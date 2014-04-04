@@ -15,9 +15,11 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
 import com.google.android.gms.drive.Drive;
 import com.google.android.gms.drive.DriveApi;
 import com.google.android.gms.drive.DriveFolder;
+import com.google.android.gms.drive.DriveId;
 import com.google.android.gms.drive.MetadataChangeSet;
 import com.google.android.gms.drive.query.Filters;
 import com.google.android.gms.drive.query.Query;
@@ -96,29 +98,6 @@ public class MainActivity extends BaseDriveActivity {
 		return super.onCreateOptionsMenu(menu);
 	} // onCrateOptionMenu()
 
-	/*
-	@Override
-	protected void onResume() {
-		super.onResume();
-
-		if (mGoogleApiClient == null) {
-			// Create the API client and bind it to an instance variable.
-			// We use this instance as the callback for connection and connection
-			// failures.
-			// Since no account name is passed, the user is prompted to choose.
-			mGoogleApiClient = new GoogleApiClient.Builder(this)
-				.addApi(Drive.API)
-				.addScope(Drive.SCOPE_FILE)
-				.addConnectionCallbacks(this)
-				.addOnConnectionFailedListener(this)
-				.build();
-		} // end if
-
-		// Connect the client.
-		mGoogleApiClient.connect();
-	} // end onResume
-	*/
-
 	@Override
 	protected void onPause() {
 		if (mGoogleApiClient != null) {
@@ -164,6 +143,8 @@ public class MainActivity extends BaseDriveActivity {
 																Filters.eq(SearchableField.TRASHED, false))).build();
 
 		Drive.DriveApi.query(getGoogleApiClient(), query).setResultCallback(metadataCallback);
+
+
 	} // end onConnected()
 
 	ResultCallback<DriveFolder.DriveFolderResult> folderCreatedCallback = new ResultCallback<DriveFolder.DriveFolderResult>() {

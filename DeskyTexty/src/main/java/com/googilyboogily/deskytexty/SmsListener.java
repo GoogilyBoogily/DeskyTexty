@@ -25,12 +25,18 @@ import com.google.android.gms.drive.query.Filters;
 import com.google.android.gms.drive.query.Query;
 import com.google.android.gms.drive.query.SearchableField;
 
+import android.text.format.Time;
+
 import java.io.IOException;
 
 public class SmsListener extends BroadcastReceiver implements GoogleApiClient.ConnectionCallbacks,
                                                               GoogleApiClient.OnConnectionFailedListener {
 	GoogleApiClient mGoogleApiClient;
 	DriveId appFolderId;
+	DriveFolder appFolder;
+
+	DriveFolder numFolder;
+
 	DriveFile fileToSave;
 
 	protected static final int REQUEST_CODE_RESOLUTION = 1;
@@ -55,8 +61,9 @@ public class SmsListener extends BroadcastReceiver implements GoogleApiClient.Co
 				mobileNum = msgs[i].getOriginatingAddress();
 
 				str += " :";
-				str += msgs[i].getMessageBody().toString();
-				messageBody = msgs[i].getMessageBody().toString();
+				str += msgs[i].getMessageBody();
+
+				messageBody = msgs[i].getMessageBody();
 
 				str += "\n";
 
@@ -106,9 +113,51 @@ public class SmsListener extends BroadcastReceiver implements GoogleApiClient.Co
 				if(result.getMetadataBuffer().getCount() != 0) {
 					appFolderId = result.getMetadataBuffer().get(0).getDriveId();
 
-					Drive.DriveApi.newContents(getGoogleApiClient()).setResultCallback(contentsResult);
+					appFolder = Drive.DriveApi.getFolder(getGoogleApiClient(), appFolderId);
+
+					appFolder.listChildren(getGoogleApiClient()).setResultCallback(listChildrenResult);
+
+
 				} // end if
 			} // end onResult()
+		};
+
+	final private ResultCallback<DriveApi.MetadataBufferResult> listChildrenResult = new
+		ResultCallback<DriveApi.MetadataBufferResult>() {
+			@Override
+			public void onResult(DriveApi.MetadataBufferResult result) {
+				int numOfChildren = result.getMetadataBuffer().getCount();
+
+				Boolean folderExists = false;
+
+				String[] temp = new String[numOfChildren];
+
+				for(int count = 0; count < numOfChildren; count++) {
+					temp[count] = result.getMetadataBuffer().get(count).getTitle();
+
+					if(result.getMetadataBuffer().get(count).getTitle().equals(mobileNum)) {
+						folderExists = true;
+						numFolder = Drive.DriveApi.getFolder(getGoogleApiClient() ,result.getMetadataBuffer().get(count).getDriveId());
+					} // end if
+				} // end for
+
+				if(folderExists) {
+					Drive.DriveApi.newContents(getGoogleApiClient()).setResultCallback(contentsResult);
+				} else {
+					MetadataChangeSet changeSet = new MetadataChangeSet.Builder().setTitle(mobileNum).build();
+					appFolder.createFolder(getGoogleApiClient(), changeSet).setResultCallback(createdNumFolder);
+				} // end else/if
+
+			} // end onResult()
+		};
+	final private ResultCallback<DriveFolder.DriveFolderResult> createdNumFolder = new
+		ResultCallback<DriveFolder.DriveFolderResult>() {
+			@Override
+			public void onResult(DriveFolder.DriveFolderResult driveFolderResult) {
+				numFolder = driveFolderResult.getDriveFolder();
+
+				Drive.DriveApi.newContents(getGoogleApiClient()).setResultCallback(contentsResult);
+			} // onResult()
 		};
 
 	final private ResultCallback<DriveApi.ContentsResult> contentsResult = new
@@ -120,13 +169,20 @@ public class SmsListener extends BroadcastReceiver implements GoogleApiClient.Co
 					return;
 				} // end if
 
-				DriveFolder folder = Drive.DriveApi.getFolder(getGoogleApiClient(), appFolderId);
+				// TODO: Probably get the time that the message was received, not the current time
+				// Get the current time
+				String currentTime;
+				Time now = new Time(Time.getCurrentTimezone());
+				now.setToNow();
+				// Link for formatting: http://www.cplusplus.com/reference/ctime/strftime/
+				currentTime = now.format("%D-%T");
 
 				MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
-					.setTitle("New file")
+					.setTitle(currentTime + ".msg")
 					.setMimeType("text/plain")
 					.build();
-				folder.createFile(getGoogleApiClient(), changeSet, result.getContents())
+
+				numFolder.createFile(getGoogleApiClient(), changeSet, result.getContents())
 					.setResultCallback(fileCallback);
 			} // end onResult()
 		};
@@ -153,7 +209,7 @@ public class SmsListener extends BroadcastReceiver implements GoogleApiClient.Co
 						} // end if
 						Contents contents = result.getContents();
 						try {
-							contents.getOutputStream().write(("Hello world -- " + mobileNum + ": " + messageBody).getBytes());
+							contents.getOutputStream().write((messageBody).getBytes());
 						} catch(IOException e) {
 							e.printStackTrace();
 						} // end try/catch
@@ -167,7 +223,6 @@ public class SmsListener extends BroadcastReceiver implements GoogleApiClient.Co
 						});
 					} // end onResult()
 				});
-
 			} // end onResult()
 		};
 
