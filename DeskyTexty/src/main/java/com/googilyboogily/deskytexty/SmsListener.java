@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.telephony.SmsMessage;
 import android.widget.Toast;
 
+import com.googilyboogily.deskytexty.services.SaveService;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -70,7 +71,15 @@ public class SmsListener extends BroadcastReceiver implements GoogleApiClient.Co
 				mobileNum = msgs[i].getOriginatingAddress();
 			} // end for
 
-			SaveSmsToGoogleDrive(mobileNum, messageBody);
+			//SaveSmsToGoogleDrive(mobileNum, messageBody);
+
+			//
+			Intent serviceIntent = new Intent(context, SaveService.class);
+
+			serviceIntent.putExtra("mobileNum", mobileNum);
+			serviceIntent.putExtra("messageBody", messageBody);
+
+			context.startService(serviceIntent);
 		} // end if
 	} // end onReceive()
 
