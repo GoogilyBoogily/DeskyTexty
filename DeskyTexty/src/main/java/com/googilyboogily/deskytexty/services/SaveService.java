@@ -10,18 +10,43 @@ import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
+import android.text.format.Time;
 import android.widget.Toast;
 import android.os.Process;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
+import com.google.android.gms.drive.Contents;
 import com.google.android.gms.drive.Drive;
+import com.google.android.gms.drive.DriveApi;
+import com.google.android.gms.drive.DriveFile;
+import com.google.android.gms.drive.DriveFolder;
+import com.google.android.gms.drive.DriveId;
+import com.google.android.gms.drive.MetadataChangeSet;
+import com.google.android.gms.drive.query.Filters;
+import com.google.android.gms.drive.query.Query;
+import com.google.android.gms.drive.query.SearchableField;
+
+import java.io.IOException;
 
 public class SaveService extends Service  implements GoogleApiClient.ConnectionCallbacks,
                                                           GoogleApiClient.OnConnectionFailedListener {
-	GoogleApiClient mGoogleApiClient;
 	protected static final int REQUEST_CODE_RESOLUTION = 1;
+
+	GoogleApiClient mGoogleApiClient;
+
+	DriveId appFolderId;
+	DriveFolder appFolder;
+
+	DriveFolder numFolder;
+
+	DriveFile fileToSave;
+
+	String mobileNum;
+	String messageBody;
 
 	/**
 	* A constructor is required, and must call the super IntentService(String)
@@ -35,29 +60,17 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 		public ServiceHandler(Looper looper) {
 			super(looper);
 		}
+
 		@Override
 		public void handleMessage(Message msg) {
-			// Normally we would do some work here, like download a file.
-			// For our sample, we just sleep for 5 seconds.
-			long endTime = System.currentTimeMillis() + 5*1000;
+			// Do service stuff!
+			SaveToDrive();
 
-			showMessage("Service started");
-			while (System.currentTimeMillis() < endTime) {
-				synchronized (this) {
-					try {
-						wait(endTime - System.currentTimeMillis());
-					} catch (Exception e) {
 
-					}
-				}
-			}
-
-			showMessage("Service ending");
-			// Stop the service using the startId, so that we don't stop
-			// the service in the middle of handling another job
+			// Stop the service
 			stopSelf(msg.arg1);
-		}
-	}
+		} // end handleMessage()
+	} // end class ServiceHandler()
 
 	@Override
 	public void onCreate() {
@@ -71,11 +84,15 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 		// Get the HandlerThread's Looper and use it for our Handler
 		mServiceLooper = thread.getLooper();
 		mServiceHandler = new ServiceHandler(mServiceLooper);
-	}
+	} // end onCreate()
 
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
-		Toast.makeText(this, "service starting", Toast.LENGTH_SHORT).show();
+		showMessage("Service starting");
+
+		// Get the mobile number and message from the intent
+		mobileNum = intent.getExtras().getString("mobileNum");
+		messageBody = intent.getExtras().getString("messageBody");
 
 		// For each start request, send a message to start a job and deliver the
 		// start ID so we know which request we're stopping when we finish the job
@@ -85,18 +102,18 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 
 		// If we get killed, after returning from here, restart
 		return START_STICKY;
-	}
+	} // end onStartCommand()
 
 	@Override
 	public IBinder onBind(Intent intent) {
 		// We don't provide binding, so return null
 		return null;
-	}
+	} // end onBind()
 
 	@Override
 	public void onDestroy() {
-		Toast.makeText(this, "service done", Toast.LENGTH_SHORT).show();
-	}
+		showMessage("Service done");
+	} // end onDestroy()
 
 	public void SaveToDrive() {
 		mGoogleApiClient = new GoogleApiClient.Builder(this)
@@ -115,7 +132,120 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 	@Override
 	public void onConnected(Bundle connectionHint) {
 		showMessage("Connected to Drive");
-	}
+
+		//
+		Query query = new Query.Builder().addFilter(Filters.and(Filters.eq(SearchableField.TITLE, "DESKYTEXTYAPPFOLDER"),
+													Filters.eq(SearchableField.MIME_TYPE, "application/vnd.google-apps.folder"),
+													Filters.eq(SearchableField.TRASHED, false))).build();
+
+		//
+		// TODO: Methodize everything
+		//
+
+
+		// Query the root folder for the app folder and wait to finish
+		DriveApi.MetadataBufferResult queryResult = Drive.DriveApi.query(getGoogleApiClient(), query).await();
+
+		// TODO: Put in better place
+		DriveApi.MetadataBufferResult listChildrenResult;
+
+		// If there is at least one result
+		// TODO: Add else statement
+
+		//if(queryResult.getMetadataBuffer().getCount() != 0) {
+		appFolderId = queryResult.getMetadataBuffer().get(0).getDriveId();
+
+		appFolder = Drive.DriveApi.getFolder(getGoogleApiClient(), appFolderId);
+
+		listChildrenResult = appFolder.listChildren(getGoogleApiClient()).await();
+		//} // end if
+
+
+
+		int numOfChildren = listChildrenResult.getMetadataBuffer().getCount();
+
+		Boolean folderExists = false;
+
+		String[] temp = new String[numOfChildren];
+
+		for(int count = 0; count < numOfChildren; count++) {
+			temp[count] = listChildrenResult.getMetadataBuffer().get(count).getTitle();
+
+			if(listChildrenResult.getMetadataBuffer().get(count).getTitle().equals(mobileNum)) {
+				folderExists = true;
+				numFolder = Drive.DriveApi.getFolder(getGoogleApiClient() ,listChildrenResult.getMetadataBuffer().get(count).getDriveId());
+			} // end if
+		} // end for
+
+
+		MetadataChangeSet changeSet;
+		DriveFolder.DriveFileResult driveFileResult;
+		if(folderExists) {
+			DriveApi.ContentsResult newContentsResult = Drive.DriveApi.newContents(getGoogleApiClient()).await();
+
+			// TODO: Probably get the time that the message was received, not the current time
+			// Get the current time
+			String currentTime;
+			Time now = new Time(Time.getCurrentTimezone());
+			now.setToNow();
+			// Link for formatting: http://www.cplusplus.com/reference/ctime/strftime/
+			currentTime = now.format("%D-%T");
+
+			changeSet = new MetadataChangeSet.Builder()
+				.setTitle(currentTime + ".msg")
+				.setMimeType("text/plain")
+				.build();
+
+			driveFileResult = numFolder.createFile(getGoogleApiClient(), changeSet, newContentsResult.getContents()).await();
+		} else {
+			changeSet = new MetadataChangeSet.Builder().setTitle(mobileNum).build();
+			DriveFolder.DriveFolderResult driveFolderResult = appFolder.createFolder(getGoogleApiClient(), changeSet).await();
+
+			numFolder = driveFolderResult.getDriveFolder();
+
+			DriveApi.ContentsResult newContentsResult = Drive.DriveApi.newContents(getGoogleApiClient()).await();
+
+			// TODO: Probably get the time that the message was received, not the current time
+			// Get the current time
+			String currentTime;
+			Time now = new Time(Time.getCurrentTimezone());
+			now.setToNow();
+			// Link for formatting: http://www.cplusplus.com/reference/ctime/strftime/
+			currentTime = now.format("%D-%T");
+
+			changeSet = new MetadataChangeSet.Builder()
+				.setTitle(currentTime + ".msg")
+				.setMimeType("text/plain")
+				.build();
+
+			driveFileResult = numFolder.createFile(getGoogleApiClient(), changeSet, newContentsResult.getContents()).await();
+		} // end else/if
+
+
+		showMessage("Created a file: " + driveFileResult.getDriveFile().getDriveId());
+
+		fileToSave = driveFileResult.getDriveFile();
+
+		DriveApi.ContentsResult contentsResult = fileToSave.openContents(mGoogleApiClient, DriveFile.MODE_WRITE_ONLY, null).await();
+
+		Contents contents = contentsResult.getContents();
+
+		try {
+			contents.getOutputStream().write((messageBody).getBytes());
+		} catch(IOException e) {
+			e.printStackTrace();
+		} // end try/catch
+
+		Status statusResult = fileToSave.commitAndCloseContents(mGoogleApiClient, contents).await();
+
+		if (statusResult.isSuccess()) {
+			showMessage("Successfully committed file");
+			mGoogleApiClient.disconnect();
+		} else {
+			showMessage("Failed to commit file");
+		} // end else/if
+
+	} // end onConnected()
 
 	/**
 	 * Called when {@code mGoogleApiClient} is disconnected.
@@ -123,7 +253,7 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 	@Override
 	public void onConnectionSuspended(int cause) {
 		mGoogleApiClient.disconnect();
-	}
+	} // end onConnectionSuspended()
 
 	/**
 	 * Called when {@code mGoogleApiClient} is trying to connect but failed.
@@ -136,25 +266,27 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 			// show the localized error dialog.
 			GooglePlayServicesUtil.getErrorDialog(result.getErrorCode(), (Activity)this.getApplicationContext(), 0).show();
 			return;
-		}
+		} // end if
+
 		try {
 			result.startResolutionForResult((Activity)this.getApplicationContext(), REQUEST_CODE_RESOLUTION);
 		} catch (IntentSender.SendIntentException e) {
-
-		}
-	}
+			// empty catch
+		} // end try/catch
+	} // end onConnectionFailed()
 
 	/**
 	 * Shows a toast message.
 	 */
 	public void showMessage(String message) {
 		Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-	}
+	} // end showMessage()
 
 	/**
 	 * Getter for the {@code GoogleApiClient}.
 	 */
 	public GoogleApiClient getGoogleApiClient() {
 		return mGoogleApiClient;
-	}
+	} // end getGoogleApiClient()
+
 } // end class SaveService
