@@ -4,6 +4,7 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/DeskyText.iml" filepath="$PROJECT_DIR$/DeskyText.iml" />
       <module fileurl="file://$PROJECT_DIR$/DeskyTexty.iml" filepath="$PROJECT_DIR$/DeskyTexty.iml" />
+      <module fileurl="file://$PROJECT_DIR$/DeskyTexty/DeskyTexty-DeskyTexty.iml" filepath="$PROJECT_DIR$/DeskyTexty/DeskyTexty-DeskyTexty.iml" />
     </modules>
   </component>
 </project>

@@ -10,14 +10,13 @@ import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
+import android.os.Process;
 import android.text.format.Time;
 import android.widget.Toast;
-import android.os.Process;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
 import com.google.android.gms.drive.Contents;
 import com.google.android.gms.drive.Drive;
@@ -59,12 +58,20 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 	private final class ServiceHandler extends Handler {
 		public ServiceHandler(Looper looper) {
 			super(looper);
-		}
+		} // end ServiceHandler()
 
 		@Override
 		public void handleMessage(Message msg) {
-			// Do service stuff!
-			SaveToDrive();
+			// TODO: This might still be fucking up with the UI thread, but I tried. The problem is here though
+			synchronized(this) {
+				try {
+					// Do service stuff!
+					SaveToDrive();
+				} catch(Exception e) {
+					// SaveToDrive() threw an exception
+					showMessage("SaveToDrive() threw an exception");
+				} // end try/catch
+			} // end synchronized
 
 
 			// Stop the service
