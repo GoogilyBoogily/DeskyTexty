@@ -62,17 +62,18 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 
 		@Override
 		public void handleMessage(Message msg) {
+
 			// TODO: This might still be fucking up with the UI thread, but I tried. The problem is here though
 			synchronized(this) {
 				try {
 					// Do service stuff!
 					SaveToDrive();
+
 				} catch(Exception e) {
 					// SaveToDrive() threw an exception
 					showMessage("SaveToDrive() threw an exception");
 				} // end try/catch
 			} // end synchronized
-
 
 			// Stop the service
 			stopSelf(msg.arg1);
@@ -140,7 +141,7 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 	public void onConnected(Bundle connectionHint) {
 		showMessage("Connected to Drive");
 
-		//
+		// Create the query for the app folder
 		Query query = new Query.Builder().addFilter(Filters.and(Filters.eq(SearchableField.TITLE, "DESKYTEXTYAPPFOLDER"),
 													Filters.eq(SearchableField.MIME_TYPE, "application/vnd.google-apps.folder"),
 													Filters.eq(SearchableField.TRASHED, false))).build();
@@ -150,7 +151,7 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 		//
 
 
-		// Query the root folder for the app folder and wait to finish
+		// Query the root folder for app folder and wait to finish
 		DriveApi.MetadataBufferResult queryResult = Drive.DriveApi.query(getGoogleApiClient(), query).await();
 
 		// TODO: Put in better place
