@@ -17,6 +17,7 @@ import android.widget.Toast;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
 import com.google.android.gms.drive.Contents;
 import com.google.android.gms.drive.Drive;
@@ -62,8 +63,6 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 
 		@Override
 		public void handleMessage(Message msg) {
-
-			// TODO: This might still be fucking up with the UI thread, but I tried. The problem is here though
 			synchronized(this) {
 				try {
 					// Do service stuff!
@@ -146,114 +145,171 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 													Filters.eq(SearchableField.MIME_TYPE, "application/vnd.google-apps.folder"),
 													Filters.eq(SearchableField.TRASHED, false))).build();
 
-		//
-		// TODO: Methodize everything
-		//
-
-
-		// Query the root folder for app folder and wait to finish
-		DriveApi.MetadataBufferResult queryResult = Drive.DriveApi.query(getGoogleApiClient(), query).await();
-
-		// TODO: Put in better place
-		DriveApi.MetadataBufferResult listChildrenResult;
-
-		// If there is at least one result
-		// TODO: Add else statement
-
-		//if(queryResult.getMetadataBuffer().getCount() != 0) {
-		appFolderId = queryResult.getMetadataBuffer().get(0).getDriveId();
-
-		appFolder = Drive.DriveApi.getFolder(getGoogleApiClient(), appFolderId);
-
-		listChildrenResult = appFolder.listChildren(getGoogleApiClient()).await();
-		//} // end if
-
-
-
-		int numOfChildren = listChildrenResult.getMetadataBuffer().getCount();
-
-		Boolean folderExists = false;
-
-		String[] temp = new String[numOfChildren];
-
-		for(int count = 0; count < numOfChildren; count++) {
-			temp[count] = listChildrenResult.getMetadataBuffer().get(count).getTitle();
-
-			if(listChildrenResult.getMetadataBuffer().get(count).getTitle().equals(mobileNum)) {
-				folderExists = true;
-				numFolder = Drive.DriveApi.getFolder(getGoogleApiClient() ,listChildrenResult.getMetadataBuffer().get(count).getDriveId());
-			} // end if
-		} // end for
-
-
-		MetadataChangeSet changeSet;
-		DriveFolder.DriveFileResult driveFileResult;
-		if(folderExists) {
-			DriveApi.ContentsResult newContentsResult = Drive.DriveApi.newContents(getGoogleApiClient()).await();
-
-			// TODO: Probably get the time that the message was received, not the current time
-			// Get the current time
-			String currentTime;
-			Time now = new Time(Time.getCurrentTimezone());
-			now.setToNow();
-			// Link for formatting: http://www.cplusplus.com/reference/ctime/strftime/
-			currentTime = now.format("%D-%T");
-
-			changeSet = new MetadataChangeSet.Builder()
-				.setTitle(currentTime + ".msg")
-				.setMimeType("text/plain")
-				.build();
-
-			driveFileResult = numFolder.createFile(getGoogleApiClient(), changeSet, newContentsResult.getContents()).await();
-		} else {
-			changeSet = new MetadataChangeSet.Builder().setTitle(mobileNum).build();
-			DriveFolder.DriveFolderResult driveFolderResult = appFolder.createFolder(getGoogleApiClient(), changeSet).await();
-
-			numFolder = driveFolderResult.getDriveFolder();
-
-			DriveApi.ContentsResult newContentsResult = Drive.DriveApi.newContents(getGoogleApiClient()).await();
-
-			// TODO: Probably get the time that the message was received, not the current time
-			// Get the current time
-			String currentTime;
-			Time now = new Time(Time.getCurrentTimezone());
-			now.setToNow();
-			// Link for formatting: http://www.cplusplus.com/reference/ctime/strftime/
-			currentTime = now.format("%D-%T");
-
-			changeSet = new MetadataChangeSet.Builder()
-				.setTitle(currentTime + ".msg")
-				.setMimeType("text/plain")
-				.build();
-
-			driveFileResult = numFolder.createFile(getGoogleApiClient(), changeSet, newContentsResult.getContents()).await();
-		} // end else/if
-
-
-		showMessage("Created a file: " + driveFileResult.getDriveFile().getDriveId());
-
-		fileToSave = driveFileResult.getDriveFile();
-
-		DriveApi.ContentsResult contentsResult = fileToSave.openContents(mGoogleApiClient, DriveFile.MODE_WRITE_ONLY, null).await();
-
-		Contents contents = contentsResult.getContents();
-
-		try {
-			contents.getOutputStream().write((messageBody).getBytes());
-		} catch(IOException e) {
-			e.printStackTrace();
-		} // end try/catch
-
-		Status statusResult = fileToSave.commitAndCloseContents(mGoogleApiClient, contents).await();
-
-		if (statusResult.isSuccess()) {
-			showMessage("Successfully committed file");
-			mGoogleApiClient.disconnect();
-		} else {
-			showMessage("Failed to commit file");
-		} // end else/if
-
+		// Query the root folder for app folder
+		Drive.DriveApi.query(getGoogleApiClient(), query).setResultCallback(queryCallback);
 	} // end onConnected()
+
+	// Callback for app folder query
+	ResultCallback<DriveApi.MetadataBufferResult> queryCallback = new ResultCallback<DriveApi.MetadataBufferResult>() {
+		@Override
+		public void onResult(DriveApi.MetadataBufferResult queryResult) {
+			if (!queryResult.getStatus().isSuccess()) {
+				showMessage("Error");
+				return;
+			} // end if
+			showMessage("Success");
+
+			// If there is at least one result
+			// TODO: Add else statement
+
+			//if(queryResult.getMetadataBuffer().getCount() != 0) {
+			appFolderId = queryResult.getMetadataBuffer().get(0).getDriveId();
+
+			appFolder = Drive.DriveApi.getFolder(getGoogleApiClient(), appFolderId);
+
+			appFolder.listChildren(getGoogleApiClient()).setResultCallback(listChildrenCallback);
+		} // end onResult()
+	};
+
+	// Callback for listing the children files inside the app folder
+	ResultCallback<DriveApi.MetadataBufferResult> listChildrenCallback = new ResultCallback<DriveApi.MetadataBufferResult>() {
+		@Override
+		public void onResult(DriveApi.MetadataBufferResult listChildrenResult) {
+			if (!listChildrenResult.getStatus().isSuccess()) {
+				showMessage("Error");
+				return;
+			} // end if
+			showMessage("Success");
+
+			// Get the number of children files
+			int numOfChildren = listChildrenResult.getMetadataBuffer().getCount();
+
+			// Var to hold if a folder exists with the mobile phone number
+			Boolean folderExists = false;
+
+			// Array of strigs to hold all the children folder names
+			String[] temp = new String[numOfChildren];
+
+			for(int count = 0; count < numOfChildren; count++) {
+				temp[count] = listChildrenResult.getMetadataBuffer().get(count).getTitle();
+
+				if(listChildrenResult.getMetadataBuffer().get(count).getTitle().equals(mobileNum)) {
+					folderExists = true;
+					numFolder = Drive.DriveApi.getFolder(getGoogleApiClient(), listChildrenResult.getMetadataBuffer().get(count).getDriveId());
+				} // end if
+			} // end for
+
+
+			if(folderExists) {
+				Drive.DriveApi.newContents(getGoogleApiClient()).setResultCallback(smsMessageContentCallback);
+			} else {
+				MetadataChangeSet changeSet = new MetadataChangeSet.Builder().setTitle(mobileNum).build();
+				appFolder.createFolder(getGoogleApiClient(), changeSet).setResultCallback(mobileNumFolderCallback);
+			} // end else/if
+
+
+		} // end onResult()
+	};
+
+	//
+	ResultCallback<DriveApi.ContentsResult> smsMessageContentCallback = new ResultCallback<DriveApi.ContentsResult>() {
+		@Override
+		public void onResult(DriveApi.ContentsResult contentsResult) {
+			if (!contentsResult.getStatus().isSuccess()) {
+				showMessage("Error");
+				return;
+			} // end if
+			showMessage("Success");
+
+			// TODO: Probably get the time that the message was received, not the current time
+			// Get the current time
+			String currentTime;
+			Time now = new Time(Time.getCurrentTimezone());
+			now.setToNow();
+			// Link for formatting: http://www.cplusplus.com/reference/ctime/strftime/
+			currentTime = now.format("%D-%T");
+
+			MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
+					.setTitle(currentTime + ".sms")
+					.setMimeType("text/plain")
+					.build();
+
+			numFolder.createFile(getGoogleApiClient(), changeSet, contentsResult.getContents()).setResultCallback(smsMessageCreatedCallback);
+
+		} // end onResult()
+	};
+
+	//
+	ResultCallback<DriveFolder.DriveFolderResult> mobileNumFolderCallback = new ResultCallback<DriveFolder.DriveFolderResult>() {
+		@Override
+		public void onResult(DriveFolder.DriveFolderResult mobileNumFolderResult) {
+			if (!mobileNumFolderResult.getStatus().isSuccess()) {
+				showMessage("Error");
+				return;
+			} // end if
+			showMessage("Success");
+
+			numFolder = mobileNumFolderResult.getDriveFolder();
+
+			Drive.DriveApi.newContents(getGoogleApiClient()).setResultCallback(smsMessageContentCallback);
+
+
+		} // end onResult()
+	};
+
+	//
+	ResultCallback<DriveFolder.DriveFileResult> smsMessageCreatedCallback = new ResultCallback<DriveFolder.DriveFileResult>() {
+		@Override
+		public void onResult(DriveFolder.DriveFileResult driveFileResult) {
+			if (!driveFileResult.getStatus().isSuccess()) {
+				showMessage("Error");
+				return;
+			} // end if
+			showMessage("Success");
+
+
+			showMessage("Created a file: " + driveFileResult.getDriveFile().getDriveId());
+			fileToSave = driveFileResult.getDriveFile();
+
+
+			fileToSave.openContents(mGoogleApiClient, DriveFile.MODE_WRITE_ONLY, null).setResultCallback(openContentCallback);
+		} // end onResult()
+	};
+
+	//
+	ResultCallback<DriveApi.ContentsResult> openContentCallback = new ResultCallback<DriveApi.ContentsResult>() {
+		@Override
+		public void onResult(DriveApi.ContentsResult contentsResult) {
+			if (!contentsResult.getStatus().isSuccess()) {
+				showMessage("Error");
+				return;
+			} // end if
+			showMessage("Success");
+
+			Contents contents = contentsResult.getContents();
+
+			try {
+				contents.getOutputStream().write((messageBody).getBytes());
+			} catch(IOException e) {
+				e.printStackTrace();
+			} // end try/catch
+
+			fileToSave.commitAndCloseContents(mGoogleApiClient, contents).setResultCallback(commitAndCloseCallback);
+		} // end onResult()
+	};
+
+	//
+	ResultCallback<Status> commitAndCloseCallback = new ResultCallback<Status>() {
+		@Override
+		public void onResult(Status statusResult) {
+			if (statusResult.isSuccess()) {
+				showMessage("Successfully committed file");
+				mGoogleApiClient.disconnect();
+			} else {
+				showMessage("Failed to commit file");
+			} // end else/if
+		} // end onResult()
+	};
 
 	/**
 	 * Called when {@code mGoogleApiClient} is disconnected.
