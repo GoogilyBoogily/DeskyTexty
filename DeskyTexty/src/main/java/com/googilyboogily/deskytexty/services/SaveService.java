@@ -101,6 +101,8 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 		mobileNum = intent.getExtras().getString("mobileNum");
 		messageBody = intent.getExtras().getString("messageBody");
 
+		showMessage(mobileNum + ": " + messageBody);
+
 		// For each start request, send a message to start a job and deliver the
 		// start ID so we know which request we're stopping when we finish the job
 		Message msg = mServiceHandler.obtainMessage();
@@ -211,7 +213,7 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 		} // end onResult()
 	};
 
-	//
+	// Callback for initially creating a new SMS message
 	ResultCallback<DriveApi.ContentsResult> smsMessageContentCallback = new ResultCallback<DriveApi.ContentsResult>() {
 		@Override
 		public void onResult(DriveApi.ContentsResult contentsResult) {
@@ -239,7 +241,7 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 		} // end onResult()
 	};
 
-	//
+	// Callback for creating a folder with the mobile number as the name
 	ResultCallback<DriveFolder.DriveFolderResult> mobileNumFolderCallback = new ResultCallback<DriveFolder.DriveFolderResult>() {
 		@Override
 		public void onResult(DriveFolder.DriveFolderResult mobileNumFolderResult) {
@@ -252,12 +254,10 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 			numFolder = mobileNumFolderResult.getDriveFolder();
 
 			Drive.DriveApi.newContents(getGoogleApiClient()).setResultCallback(smsMessageContentCallback);
-
-
 		} // end onResult()
 	};
 
-	//
+	// Callback for putting the contents of the SMS message in
 	ResultCallback<DriveFolder.DriveFileResult> smsMessageCreatedCallback = new ResultCallback<DriveFolder.DriveFileResult>() {
 		@Override
 		public void onResult(DriveFolder.DriveFileResult driveFileResult) {
@@ -276,7 +276,7 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 		} // end onResult()
 	};
 
-	//
+	// Callback for opening the contents of the SMS message
 	ResultCallback<DriveApi.ContentsResult> openContentCallback = new ResultCallback<DriveApi.ContentsResult>() {
 		@Override
 		public void onResult(DriveApi.ContentsResult contentsResult) {
@@ -298,7 +298,7 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 		} // end onResult()
 	};
 
-	//
+	// Callback for committing and closing the SMS message
 	ResultCallback<Status> commitAndCloseCallback = new ResultCallback<Status>() {
 		@Override
 		public void onResult(Status statusResult) {
