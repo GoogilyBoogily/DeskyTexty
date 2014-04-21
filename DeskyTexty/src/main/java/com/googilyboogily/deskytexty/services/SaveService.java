@@ -121,6 +121,10 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 
 	@Override
 	public void onDestroy() {
+		if(mGoogleApiClient != null) {
+			mGoogleApiClient.disconnect();
+		} // end if
+
 		showMessage("Service done");
 	} // end onDestroy()
 
@@ -237,7 +241,6 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 					.build();
 
 			numFolder.createFile(getGoogleApiClient(), changeSet, contentsResult.getContents()).setResultCallback(smsMessageCreatedCallback);
-
 		} // end onResult()
 	};
 
@@ -268,7 +271,7 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 			showMessage("Success");
 
 
-			showMessage("Created a file: " + driveFileResult.getDriveFile().getDriveId());
+			//showMessage("Created a file: " + driveFileResult.getDriveFile().getDriveId());
 			fileToSave = driveFileResult.getDriveFile();
 
 
@@ -302,11 +305,10 @@ public class SaveService extends Service  implements GoogleApiClient.ConnectionC
 	ResultCallback<Status> commitAndCloseCallback = new ResultCallback<Status>() {
 		@Override
 		public void onResult(Status statusResult) {
-			if (statusResult.isSuccess()) {
-				showMessage("Successfully committed file");
-				mGoogleApiClient.disconnect();
-			} else {
+			if (!statusResult.isSuccess()) {
 				showMessage("Failed to commit file");
+			} else {
+				showMessage("Successfully committed file");
 			} // end else/if
 		} // end onResult()
 	};
