@@ -6,7 +6,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.telephony.SmsMessage;
 
-import com.googilyboogily.deskytexty.services.SaveService;
+import com.googilyboogily.deskytexty.services.SaveReceivedSMSService;
 
 public class SmsListener extends BroadcastReceiver {
 	String mobileNum;
@@ -38,8 +38,8 @@ public class SmsListener extends BroadcastReceiver {
 				mobileNum = msgs[i].getOriginatingAddress();
 			} // end for
 
-			// Create the SaveService intent
-			Intent serviceIntent = new Intent(context, SaveService.class);
+			// Create the SaveReceivedSMSService intent
+			Intent serviceIntent = new Intent(context, SaveReceivedSMSService.class);
 
 			// Push the mobile number and message body to the intent
 			serviceIntent.putExtra("mobileNum", mobileNum);
